@@ -1,0 +1,4 @@
+node_modules/
+config_real.json
+config_shell.json
+files/
