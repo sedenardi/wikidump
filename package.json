@@ -1,0 +1,20 @@
+{
+  "name": "wikidump",
+  "version": "0.0.1",
+  "description": "Parsing and ingesting Wikipedia data dumps",
+  "main": "pageLinks.js",
+  "dependencies": {
+    "mysql": "^2.5.5",
+    "bluebird": "^2.9.14"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sedenardi/wikidump.git"
+  },
+  "author": "Sanders DeNardi <sedenardi@gmail.com> (http://www.sandersdenardi.com/)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/sedenardi/wikidump/issues"
+  },
+  "homepage": "https://github.com/sedenardi/wikidump"
+}
