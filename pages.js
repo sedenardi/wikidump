@@ -1,55 +1,15 @@
-var config = require('./config.json'),
-    fs = require('fs'),
-    stream = require('stream'),
-    RecordExtractor = require('./recordExtractor.js'),
-    Promise = require('bluebird'),
-    Writable = require('stream').Writable,
-    util = require('util');
+var SqlIngester = require('./sqlIngester.js');
 
-Promise.promisifyAll(fs);
-
-var fileName = 'files/enwiki-20150304-page.sql';
-
-var fileSize = 0,
-    percentageDone = 0;
-var extractor = new RecordExtractor();
-extractor.on('progress', function(size) {
-  var percentage = Math.floor((size / fileSize)*100);
-  if (percentage > percentageDone) {
-    percentageDone = percentage;
-    console.log('Percentage done: ' + percentageDone);
+var ingester = new SqlIngester({
+  fileName: '/run/media/sanders/1TB/wikidump/enwiki-20150304-page.sql',
+  queryString: 'INSERT INTO `page2` (`page_id`,`page_title`,`page_is_redirect`,`page_len`) VALUES ?',
+  insertFunction: function(chunk) {
+    return [chunk[0],chunk[2],chunk[5],chunk[10]];
+  },
+  batchSize: 10000,
+  filter: function(chunk) {
+    return chunk[1] === 0;
   }
 });
 
-var nameSpaceFilter = new stream.Transform({
-  objectMode: true,
-  transform: function(chunk, encoding, next) {
-    if (chunk[1] === 0)
-      this.push(chunk);
-    next();
-  }
-});
-
-var recCount = 0;
-var counter = new stream.Writable({
-  objectMode: true,
-  write: function(chunk, encoding, next) {
-    recCount++;
-    next();
-  }
-});
-counter.on('finish', function() {
-  console.log(recCount + ' total records.');
-})
-
-fs.statAsync(fileName)
-  .then(function(res){
-    fileSize = res.size;
-    fs.createReadStream(fileName)
-      .pipe(extractor)
-      .pipe(nameSpaceFilter)
-      .pipe(counter);
-  })
-  .catch(function(e) {
-    console.log(e);
-  });
+ingester.start();
