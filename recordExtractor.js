@@ -43,7 +43,8 @@ RecordExtractor.prototype._parseDataTypes = function(record) {
       item = item.slice(1,item.length-1);
     }
 
-    if (item.length && !isNaN(item)) {
+    //if (item.length && !isNaN(item)) {
+    if (item.match(/^[0-9]\d*(\.\d+)?$/)) {
       record[i] = parseFloat(item);
     } else if (item === 'NULL') {
       record[i] = null;
@@ -51,6 +52,7 @@ RecordExtractor.prototype._parseDataTypes = function(record) {
       record[i] = item;
     }
   }
+  //console.log(record);
 };
 
 RecordExtractor.prototype._parseRecord = function(record) {

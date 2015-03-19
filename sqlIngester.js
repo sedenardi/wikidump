@@ -5,7 +5,7 @@ var config = require('./config.json'),
     Promise = require('bluebird'),
     Writable = require('stream').Writable,
     util = require('util'),
-    mysql = require('mysql');
+    mysql = require('mysql2');
 
 Promise.promisifyAll(fs);
 
@@ -13,11 +13,11 @@ var SqlIngester = function(options) {
   this.options = options;
 
   var self = this;
-  this.connection = mysql.createConnection(config.mysql);
+  this.connection;
   this.fileSize = 0;
   this.percentageDone = 0;
   this.recordCount = 0;
-  this.inserts = [];
+  this.records = [];
 
   this.extractor = new RecordExtractor();
   this.extractor.on('progress', function(size) {
@@ -31,14 +31,10 @@ var SqlIngester = function(options) {
   this.queryWriter = new stream.Writable({
     objectMode: true,
     write: function(chunk, encoding, next) {
-      self.inserts.push(options.insertFunction(chunk));
+      self.records.push(options.insertFunction(chunk));
       self.recordCount++;
-      if (self.inserts.length === options.batchSize) {
-        self.connection.query(options.queryString, [self.inserts], function(err,res) {
-          console.log(self.recordCount + ' records inserted.');
-          self.inserts.length = 0;
-          next();
-        });
+      if (self.records.length === options.batchSize) {
+        self.insertRecords(next);
       } else {
         next();
       }    
@@ -46,14 +42,39 @@ var SqlIngester = function(options) {
   });
 
   this.queryWriter.on('finish', function() {
-    self.connection.query(self.options.queryString, self.inserts, function(err,res) {
+    self.insertRecords(function() {
       console.log(self.recordCount + ' records inserted. Closing connection.');
       self.connection.end();
     });
   });
 };
 
-SqlIngester.prototype.start = function() {
+SqlIngester.prototype.insertRecords = function(next) {
+  var self = this;
+  var query = this.options.queryFunction(self.records);
+  self.connection.query(query.sql, query.inserts, function(err,res) {
+    if (err) {
+      console.log(err);
+      self.connect(function() {
+        self.insertRecords(next);
+      });
+      return;
+    }
+    if (self.recordCount % 100000 === 0) {
+      console.log(self.recordCount + ' records inserted.');
+    }
+    self.records.length = 0;
+    next();
+  });
+};
+
+SqlIngester.prototype.connect = function(cb) {
+  this.connection = mysql.createConnection(config.mysql);
+  console.log('MYSQL Connected.');
+  cb();
+};
+
+SqlIngester.prototype.beginRead = function() {
   var self = this;
   fs.statAsync(self.options.fileName)
     .then(function(res){
@@ -73,6 +94,13 @@ SqlIngester.prototype.start = function() {
     .catch(function(e) {
       console.log(e);
     });
+};
+
+SqlIngester.prototype.start = function() {
+  var self = this;
+  this.connect(function() {
+    self.beginRead();
+  });
 };
 
 module.exports = SqlIngester;
